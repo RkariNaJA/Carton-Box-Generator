@@ -1,3 +1,8 @@
 # Exclude vendored third-party libraries from GitHub's language statistics,
 # so the language bar reflects the app source rather than the bundled library.
 *.min.js linguist-vendored
+
+# The Version/ folder is the archived pre-React app + alternative theme
+# stylesheets, kept only for reference. Exclude it from language stats so the
+# bar reflects the active React source in src/ (it stays in the repo).
+Version/** linguist-vendored

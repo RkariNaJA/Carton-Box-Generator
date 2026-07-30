@@ -1,4 +1,4 @@
-# Carton Box Generator
+# Carton Box Generator — Hi-Tech Apparel
 
 A small web app that turns a customer **EAN Excel file** into a **"Note" carton table** (Style, Color, Size, Total CTN, Star CTN, End CTN, Order Qty, Qty/CTN) and lets you download the result as a new Excel file.
 

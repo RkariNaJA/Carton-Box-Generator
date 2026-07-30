@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# COMPANY DATA — never commit real customer/order files.
+# Input/Output hold real BABOLAT/UCC EAN spreadsheets; keep them LOCAL only.
+# ---------------------------------------------------------------------------
+Input/
+Output/
+
+# Safety net: block any spreadsheet / PDF / CSV anywhere in the repo,
+# so a stray data file can never be committed by accident.
+*.xlsx
+*.xls
+*.xlsm
+*.pdf
+*.csv
+
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+
+# ---------------------------------------------------------------------------
+# Build output (regenerate with `npm run build`)
+# ---------------------------------------------------------------------------
+dist/
+/index.html
+
+# ---------------------------------------------------------------------------
+# Local tool / editor settings
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
+**/settings.local.json
+
+# ---------------------------------------------------------------------------
+# OS / misc junk
+# ---------------------------------------------------------------------------
+Thumbs.db
+.DS_Store
+*.log

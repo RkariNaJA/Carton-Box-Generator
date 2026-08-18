@@ -67,7 +67,31 @@ export function parseWorkbook(wb, defaultQty) {
     throw new Error('Found sheet "' + found.name + '" but no data rows with a quantity. Please check the file.');
   }
 
-  return { rows, sheetName: found.name };
+  return { rows: mergeDuplicateRows(rows), sheetName: found.name };
+}
+
+// Same Style + Color + Size = the same SKU, so two (or more) lines for it are
+// really one order line split across rows. Add their quantities together into a
+// single record BEFORE any carton maths, otherwise each partial line would
+// round up to its own carton and we would ship half-empty boxes.
+// The first row wins for every other field (EAN, PO, ETD, …); only Order Qty
+// is summed. mergedCount records how many source rows went into the record.
+export function mergeDuplicateRows(rows) {
+  const byKey = new Map();
+  const merged = [];
+  rows.forEach(r => {
+    const key = [r.style, r.color, r.size].map(v => String(v ?? "").trim().toLowerCase()).join("~|~");
+    const hit = byKey.get(key);
+    if (hit) {
+      hit.orderQty += r.orderQty;
+      hit.mergedCount += 1;
+    } else {
+      const rec = { ...r, mergedCount: 1 };
+      byKey.set(key, rec);
+      merged.push(rec);
+    }
+  });
+  return merged;
 }
 
 // Compute Total CTN + running Star/End carton numbers (same as the Excel formulas:
@@ -179,10 +203,14 @@ function buildManifestSheet(computed) {
   const aoa = [MANIFEST_HEADER.slice()];
   computed.forEach(r => {
     const sku = skuFromEan(r.ean);
-    const qtyBox = String(r.qtyPerCtn).padStart(5, "0");
     const po = String(r.po ?? "").trim();
     const start = Number(r.startCtn);   // numeric first carton for this SKU
     for (let k = 0; k < r.totalCtn; k++) {
+      // Every box holds a full Qty/CTN except the last one when the order does
+      // not divide evenly — that box carries the leftover pieces (the "scrap"
+      // carton), so QTY/Box and the 128C barcode state what is really inside.
+      const isScrapBox = r.scrapQty > 0 && k === r.totalCtn - 1;
+      const qtyBox = String(isScrapBox ? r.scrapQty : r.qtyPerCtn).padStart(5, "0");
       const parcel = String(start + k).padStart(6, "0");
       const barcode = po + parcel + sku + qtyBox;
       aoa.push([

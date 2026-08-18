@@ -338,6 +338,21 @@ td.mono, thead th.mono { font-family: var(--font-mono); }
 td.num { font-family: var(--font-mono); }
 td.ctn { font-family: var(--font-mono); color: var(--ink-2); letter-spacing: .04em; }
 td.strong { font-weight: 600; }
+/* "+1" tag on a row whose duplicates (same style/col./size) were added together */
+.merged {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+  cursor: help;
+}
 tbody tr { transition: background .12s; }
 tbody tr:nth-child(even) { background: var(--row-alt); }
 tbody tr:hover { background: var(--row-hover); box-shadow: inset 3px 0 0 var(--accent); }

@@ -40,7 +40,14 @@ export default function ResultTable({ visible, onRowQtyChange, filtering, showFi
           {visible.map(({ r, fileId, rowIdx, key }) => (
             <tr key={key}>
               {showFile && <td className="file-cell" title={r.fileName}>{r.fileName}</td>}
-              <td className="strong">{r.style}</td>
+              <td className="strong">
+                {r.style}
+                {r.mergedCount > 1 && (
+                  <span className="merged" title={r.mergedCount + " rows with the same style/colour/size were added together"}>
+                    +{r.mergedCount - 1}
+                  </span>
+                )}
+              </td>
               <td>{r.color}</td>
               <td>{r.size}</td>
               <td className="num">{r.totalCtn}</td>

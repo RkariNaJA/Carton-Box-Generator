@@ -139,8 +139,9 @@ export default function App() {
               Each file downloads as its own <strong>UCC …xlsx</strong> (use ⬇ next to a file, or “Download all”),
               with carton numbers restarting at 00001. Edit the dashed<span className="swatch"></span>Qty/CTN cell of any
               row — carton numbers recalculate automatically. Filters only change what is shown.
-              Rows with the same Style + col. + size are added together into one record (marked
-              <span className="merged">+n</span>) before the cartons are worked out.
+              Rows with the same Style + col. + size <strong>and the same ETD</strong> are added together into
+              one record (marked <span className="merged">+n</span>) before the cartons are worked out — a
+              different shipping date stays its own record and its own boxes.
             </div>
           </div>
         )}

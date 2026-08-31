@@ -437,6 +437,11 @@ footer {
 .fc-remove:hover { border-color: var(--danger); color: var(--danger); }
 
 /* File column in the combined result table */
+.etd {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2);
+  white-space: nowrap;
+}
+
 .file-cell {
   max-width: 200px;
   font-family: var(--font-mono); font-size: 11px; color: var(--ink-2);

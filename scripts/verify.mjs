@@ -5,11 +5,12 @@
 //                    and compare the manifest + Note sheets cell by cell.
 //   [2] INVARIANTS — rules that must hold for EVERY input in Input/, even ones
 //                    with no reference file (nothing lost, no gaps, no dupes).
-//   [3] RULES      — the two logic rules, checked on made-up numbers:
-//                    same Style/Color/Size rows merge, last box takes the scrap.
+//   [3] RULES      — the logic rules, checked on made-up numbers: same
+//                    Style/Color/Size rows merge only when the ETD is the same
+//                    day, and the last box takes the scrap.
 import { readFileSync, readdirSync, existsSync } from "fs";
 import * as XLSX from "xlsx";
-import { parseWorkbook, computeCartons, buildWorkbook, outputFileName, mergeDuplicateRows } from "../src/excel.js";
+import { parseWorkbook, computeCartons, buildWorkbook, outputFileName, mergeDuplicateRows, etdKey } from "../src/excel.js";
 
 let fails = 0, checks = 0;
 const is = (cond, msg) => { checks++; if (cond) console.log("   PASS  " + msg); else { fails++; console.log("   FAIL  " + msg); } };
@@ -169,8 +170,8 @@ for (const [, f] of [...inputs].sort()) {
   const totalCtn = computed.reduce((s, r) => s + r.totalCtn, 0);
   console.log(`\n  ${f.split("/").pop()}  (${rows.length} records, ${man.length} boxes)`);
 
-  const keys = rows.map(r => [r.style, r.color, r.size].join("|").toLowerCase());
-  is(new Set(keys).size === keys.length, "no duplicate Style+col.+size survives the merge");
+  const keys = rows.map(r => [r.style, r.color, r.size].join("|").toLowerCase() + "|" + etdKey(r.etd));
+  is(new Set(keys).size === keys.length, "no duplicate Style+col.+size+ETD survives the merge");
   is(man.length === totalCtn && note.length === rows.length, `manifest ${man.length} == sum Total CTN ${totalCtn}, Note ${note.length} == records ${rows.length}`);
 
   // The one that matters most: the boxes must add back up to what was ordered.
@@ -195,7 +196,7 @@ for (const [, f] of [...inputs].sort()) {
 }
 
 // -------------------------------------------------------------------- [3] RULES
-console.log("\n[3] RULES — the two logic rules on made-up numbers");
+console.log("\n[3] RULES — the logic rules on made-up numbers");
 const row = (style, color, size, qty, extra = {}) =>
   ({ style, color, size, orderQty: qty, qtyPerCtn: 48, ean: "3324922441251", po: "0206772", ...extra });
 
@@ -220,6 +221,56 @@ console.log("\n  merging same Style + Color + Size");
 
   m = mergeDuplicateRows([row("A", "", "", 10), row("A", "", "", 10)]);
   is(m.length === 1 && m[0].orderQty === 20, "rows with blank colour/size still merge");
+}
+
+console.log("\n  same Style + Color + Size but a different ETD must NOT merge");
+{
+  const etdRow = (etd, qty) => row("A", "BLUE", "M", qty, { etd });
+
+  let m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("01 Nov 2026", 20)]);
+  is(m.length === 1 && m[0].orderQty === 50, "same ETD -> merged (30+20 = 50)");
+
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("15 Dec 2026", 20)]);
+  is(m.length === 2 && m[0].orderQty === 30 && m[1].orderQty === 20, "different day -> two separate records");
+
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("01 Dec 2026", 20)]);
+  is(m.length === 2, "same day + year, different month -> separate");
+
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("01 Nov 2027", 20)]);
+  is(m.length === 2, "same day + month, different year -> separate");
+
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow(" 1 november 2026 ", 20)]);
+  is(m.length === 1 && m[0].orderQty === 50, "same date written differently still merges");
+
+  m = mergeDuplicateRows([etdRow("", 30), etdRow("", 20)]);
+  is(m.length === 1 && m[0].orderQty === 50, "both ETDs blank -> merge as before");
+
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("", 20)]);
+  is(m.length === 2, "one ETD blank, one filled -> separate");
+
+  // The merged record keeps the first row's ETD, so the manifest still prints a date.
+  m = mergeDuplicateRows([etdRow("01 Nov 2026", 30), etdRow("01 Nov 2026", 20)]);
+  is(m[0].etd === "01 Nov 2026", "merged record keeps the ETD text for the output file");
+
+  // Two different ETDs each get their own boxes in the exported manifest.
+  {
+    const computed = computeCartons(mergeDuplicateRows([etdRow("01 Nov 2026", 40), etdRow("15 Dec 2026", 40)]));
+    const man = aoa(buildWorkbook(computed, "S"), "S").slice(1);
+    is(man.length === 2 && man[0][8] === "01 Nov 2026" && man[1][8] === "15 Dec 2026",
+       "export: 40 + 40 on two dates -> 2 boxes, one per ETD");
+    is(man[0][7] === "00040" && man[1][7] === "00040", "each box holds its own 00040, not one merged 00080");
+  }
+}
+
+console.log("\n  etdKey() reads the date out of whatever Excel gives us");
+{
+  is(etdKey("01 Nov 2026") === "2026-11-01", `"01 Nov 2026" -> ${etdKey("01 Nov 2026")}`);
+  is(etdKey("2026-11-01") === "2026-11-01", `"2026-11-01" -> ${etdKey("2026-11-01")}`);
+  is(etdKey(new Date(2026, 10, 1)) === "2026-11-01", `Date(2026-11-01) -> ${etdKey(new Date(2026, 10, 1))}`);
+  is(etdKey(46327) === "2026-11-01", `Excel serial 46327 -> ${etdKey(46327)}`);
+  is(etdKey("46327") === etdKey(46327.75), "serial as text == the same serial with a time part");
+  is(etdKey("1/11/2026") === etdKey("01/11/2026"), "slash dates: padding does not change the key");
+  is(etdKey("TBC") === "tbc" && etdKey("") === "" && etdKey(null) === "", "non-dates fall back to plain text");
 }
 
 console.log("\n  last box carries the scrap");

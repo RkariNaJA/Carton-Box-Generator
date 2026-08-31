@@ -30,7 +30,7 @@ export default function ResultTable({ visible, onRowQtyChange, filtering, showFi
         <thead>
           <tr>
             {showFile && <th>File</th>}
-            <th>Style</th><th>col.</th><th>size</th><th className="num">Total CTN</th>
+            <th>Style</th><th>col.</th><th>size</th><th>ETD</th><th className="num">Total CTN</th>
             <th className="num">Full CTN</th><th className="num">Scrap CTN</th>
             <th className="mono">Star CTN</th><th className="mono">End CTN</th>
             <th className="num">Order Qty</th><th className="num">Qty/CTN</th>
@@ -43,13 +43,14 @@ export default function ResultTable({ visible, onRowQtyChange, filtering, showFi
               <td className="strong">
                 {r.style}
                 {r.mergedCount > 1 && (
-                  <span className="merged" title={r.mergedCount + " rows with the same style/colour/size were added together"}>
+                  <span className="merged" title={r.mergedCount + " rows with the same style/colour/size and the same ETD were added together"}>
                     +{r.mergedCount - 1}
                   </span>
                 )}
               </td>
               <td>{r.color}</td>
               <td>{r.size}</td>
+              <td className="etd">{r.etd}</td>
               <td className="num">{r.totalCtn}</td>
               <td className="num">{r.fullCtn}</td>
               <td className="num">{r.scrapQty > 0 ? r.scrapQty : ""}</td>
@@ -64,7 +65,7 @@ export default function ResultTable({ visible, onRowQtyChange, filtering, showFi
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={showFile ? 4 : 3}>Total{filtering ? " (filtered)" : ""}</td>
+            <td colSpan={showFile ? 5 : 4}>Total{filtering ? " (filtered)" : ""}</td>
             <td className="num">{sumCtn.toLocaleString()}</td>
             <td className="num">{sumFull.toLocaleString()}</td>
             <td></td>

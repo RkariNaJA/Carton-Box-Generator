@@ -70,17 +70,73 @@ export function parseWorkbook(wb, defaultQty) {
   return { rows: mergeDuplicateRows(rows), sheetName: found.name };
 }
 
-// Same Style + Color + Size = the same SKU, so two (or more) lines for it are
-// really one order line split across rows. Add their quantities together into a
-// single record BEFORE any carton maths, otherwise each partial line would
-// round up to its own carton and we would ship half-empty boxes.
-// The first row wins for every other field (EAN, PO, ETD, …); only Order Qty
-// is summed. mergedCount records how many source rows went into the record.
+// ---------------------------------------------------------------- ETD matching
+// Rows only merge when they ship on the same day, so the ETD ("8. Shipping date")
+// has to be compared as a date and not as raw text: the template writes
+// "01 Nov 2026", but the same column can arrive as a real Excel date cell
+// (a serial number) or as "2026-11-01". etdKey() reduces all of those to
+// YYYY-MM-DD so day/month/year decide the match, and falls back to the plain
+// text when the value is not a date at all (blank, "TBC", …).
+const MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+const pad2 = n => String(n).padStart(2, "0");
+const isoDate = (y, m, d) => y + "-" + pad2(m) + "-" + pad2(d);
+
+function etdToIso(value) {
+  if (value == null) return "";
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? "" : isoDate(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  }
+  const s = String(value).trim();
+  if (s === "") return "";
+
+  // A bare number is an Excel date serial (days since 1899-12-30). Drop the
+  // time part so 46323 and 46323.5 are the same day.
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Math.floor(Number(s));
+    if (n < 20000 || n > 80000) return "";                  // not a plausible date
+    const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+    return isoDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+
+  const parts = s.toLowerCase().match(/[a-z]+|\d+/g) || [];
+  const nums = parts.filter(p => /^\d+$/.test(p)).map(Number);
+  const monthWord = parts.find(p => /^[a-z]+$/.test(p) && MONTHS[p.slice(0, 3)]);
+
+  // "01 Nov 2026" / "1 November 2026" / "Nov 1, 2026"
+  if (monthWord && nums.length >= 2) {
+    const year = nums.find(n => n > 31) ?? nums[nums.length - 1];
+    const day  = nums.find(n => n <= 31) ?? 1;
+    return isoDate(year, MONTHS[monthWord.slice(0, 3)], day);
+  }
+
+  if (nums.length >= 3) {
+    if (nums[0] > 31) return isoDate(nums[0], nums[1], nums[2]);          // 2026-11-01
+    // 01/11/2026 — day/month order is unknown, so keep it as written and only
+    // pad it, which still makes "1/11/2026" and "01/11/2026" the same key.
+    if (nums[2] > 31) return nums[2] + "-" + pad2(nums[0]) + "-" + pad2(nums[1]);
+  }
+  return "";
+}
+
+// The value two rows must share to be treated as the same shipping date.
+export function etdKey(value) {
+  return etdToIso(value) || String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Same Style + Color + Size + ETD = the same SKU on the same shipment, so two
+// (or more) lines for it are really one order line split across rows. Add their
+// quantities together into a single record BEFORE any carton maths, otherwise
+// each partial line would round up to its own carton and we would ship
+// half-empty boxes. Rows that match on Style/Color/Size but ship on a different
+// date stay separate — they are different shipments and cannot share a box.
+// The first row wins for every other field (EAN, PO, …); only Order Qty is
+// summed. mergedCount records how many source rows went into the record.
 export function mergeDuplicateRows(rows) {
   const byKey = new Map();
   const merged = [];
   rows.forEach(r => {
-    const key = [r.style, r.color, r.size].map(v => String(v ?? "").trim().toLowerCase()).join("~|~");
+    const key = [r.style, r.color, r.size].map(v => String(v ?? "").trim().toLowerCase())
+      .concat(etdKey(r.etd)).join("~|~");
     const hit = byKey.get(key);
     if (hit) {
       hit.orderQty += r.orderQty;

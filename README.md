@@ -21,6 +21,12 @@ barcoded.
 EAN order file  →  carton table on screen  →  UCC Excel file (manifest + Note sheet)
 ```
 
+![The carton table, with two shipping dates for the same style kept apart](docs/images/carton-box-generator.jpg)
+
+<sub>Real output — the customer's style codes, colours and the source filename are blurred. Look at
+the first two rows: the same style in the same size, but one ships 10 Oct and one 10 Dec, so they
+stay separate records with their own cartons instead of being added together.</sub>
+
 ---
 
 ## The problem it solves
